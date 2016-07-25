@@ -56,8 +56,3 @@ TEST("net::http::response::read() - implicit Content-Length") {
     res.content = "Hello World\n";
     CHECK(res.write() == expected);
 }
-
-
-int main(int, const char**) {
-    return tests::run();
-}
