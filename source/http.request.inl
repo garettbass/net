@@ -5,16 +5,6 @@ namespace net {
 namespace http {
 
 
-    void
-    request::reset() {
-        method = METHOD_UNKNOWN;
-        uri.clear();
-        query.clear();
-        headers.clear();
-        content.clear();
-    }
-
-
     static
     substr
     read_head(const substr& head, const substr& name) {
@@ -25,6 +15,7 @@ namespace http {
     }
 
     template<typename T>
+    static
     T
     read_head(const substr& headers, const substr& name, T fallback = {}) {
         substr value = read_head(headers, name);
@@ -32,37 +23,67 @@ namespace http {
     }
 
 
+    //--------------------------------------------------------------------------
+
+
+    void
+    request::reset() {
+        method = METHOD_UNKNOWN;
+        uri.clear();
+        query.clear();
+        headers.clear();
+        content.clear();
+    }
+
+
     bool
     request::read(string& buffer) {
-        static const substr HTTP_VERSION = "HTTP/1.1\r\n";
-        static const substr LINE_BREAK = "\r\n";
-        static const substr HEAD_BREAK = "\r\n\r\n";
-
         reset();
 
         const substr data = buffer;
 
-        substr head = data.including(HEAD_BREAK);
+        substr head = data.including("\r\n\r\n");
         if (not head) return false;
 
         const size_t heading_length = head.size();
         const size_t content_length = read_head(head,"Content-Length",0);
-        const size_t request_length = heading_length + content_length;
+        const size_t message_length = heading_length + content_length;
 
-        const substr request = data.prefix(request_length);
-        if (not request) return false;
+        const substr message = data.prefix(message_length);
+        if (not message) return false;
 
-        method = string_to_method(request.begin());
-        assert(method);
+        // <method> <uri> HTTP/1.1\r\n
+        method = string_to_method(head.begin());
+        if (not method) {
+            reset();
+            return false;
+        }
 
-        uri =
-            request
+        substr url = 
+            head
             .after(method_to_string(method))
             .skip(isspace)
-            .before(HTTP_VERSION)
+            .before("HTTP/1.1\r\n")
             .truncate(isspace);
 
-        head = head.after(HTTP_VERSION);
+        uri = url;
+
+        if (url.seek('?')) {
+            uri = url.before('?');
+            url = url.after('?');
+            while (url) {
+                if (const substr key = url.before('=')) {
+                    const substr value =
+                        (url.seek('&'))
+                        ? url.after('=').before('&')
+                        : url.after('=');
+                    query.set(string(key), string(value));
+                }
+                url = url.after('&');
+            }
+        }
+
+        head = head.after("HTTP/1.1\r\n");
         while (head) {
             if (const substr key = head.before(':')) {
                 const substr value =
@@ -73,12 +94,12 @@ namespace http {
                     .truncate(isspace);
                 headers.set(string(key), string(value));
             }
-            head = head.after(LINE_BREAK);
+            head = head.after("\r\n");
         }
 
-        content = request.after(HEAD_BREAK);
+        content = message.after("\r\n\r\n");
 
-        buffer.erase(0, request.length());
+        buffer.erase(0, message.length());
         return true;
     }
 

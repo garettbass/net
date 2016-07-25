@@ -23,9 +23,6 @@ namespace net {
         substr(const char* begin, size_t length)
         : _begin(begin), _length(begin ? length : 0) {}
 
-        substr(const char* begin, const char* end)
-        : _begin(begin), _length(size_t(end) - size_t(begin)) {}
-
         substr(const char* str)
         : substr(str, str ? strlen(str) : 0) {}
 
@@ -86,17 +83,14 @@ namespace net {
         substr seek(int(&)(int)) const;
         substr seek(char) const;
         substr seek(const substr&) const;
-        substr seek(size_t offset) const;
 
         substr skip(int(&)(int)) const;
         substr skip(char) const;
         substr skip(const substr&) const;
-        substr skip(size_t length) const;
 
         substr truncate(int(&)(int)) const;
         substr truncate(char) const;
         substr truncate(const substr&) const;
-        substr truncate(size_t length) const;
     };
 
     //--------------------------------------------------------------------------
@@ -260,7 +254,7 @@ namespace net {
         const char* const end = itr + _length;
         for (;itr < end;++itr) {
             if (cc(itr[0]))
-                return {itr, end};
+                return { itr, size_t(end) - size_t(itr) };
         }
         return {};
     }
@@ -274,7 +268,7 @@ namespace net {
         const char* const end = itr + _length;
         for (;itr < end;++itr) {
             if (itr[0] == c)
-                return {itr, end};
+                return { itr, size_t(end) - size_t(itr) };
         }
         return {};
     }
@@ -296,14 +290,6 @@ namespace net {
     }
 
 
-    inline
-    substr
-    substr::seek(const size_t offset) const {
-        if (offset >= _length) return {};
-        return { _begin + offset, _length - offset };
-    }
-
-
     //--------------------------------------------------------------------------
 
 
@@ -314,7 +300,7 @@ namespace net {
         const char* itr = _begin;
         const char* const end = itr + _length;
         while (itr < end and cc(itr[0])) { ++itr; }
-        return {itr, end};
+        return { itr, size_t(end) - size_t(itr) };
     }
 
 
@@ -330,14 +316,8 @@ namespace net {
     inline
     substr
     substr::skip(const substr& p) const {
-        return has_prefix(p) ? skip(p._length) : *this;
-    }
-
-    inline
-    substr
-    substr::skip(size_t length) const {
-        if (length >= _length) return {};
-        return substr(_begin + length, _length - length);
+        if (not has_prefix(p)) return {};
+        return { _begin + p._length, _length - p._length };
     }
 
 
@@ -351,27 +331,23 @@ namespace net {
         const char* const rend = _begin - 1;
         const char* ritr = rend + _length;
         while (ritr > rend and cc(ritr[0])) { --ritr; }
-        return {_begin, size_t(ritr) - size_t(rend)};
+        return { _begin, size_t(ritr) - size_t(rend) };
     }
 
 
     inline
     substr
     substr::truncate(const char c) const {
-        return has_suffix(c) ? truncate(size_t(1)) : *this;
+        if (not has_suffix(c)) return *this;
+        return { _begin, _length - 1 }; 
     }
+
 
     inline
     substr
     substr::truncate(const substr& s) const {
-        return has_suffix(s) ? truncate(s._length) : *this;
-    }
-
-    inline
-    substr
-    substr::truncate(size_t length) const {
-        if (length >= _length) return {};
-        return substr(_begin, _length - length);
+        if (not has_suffix(s)) return *this;
+        return { _begin, _length - s._length };
     }
 
 

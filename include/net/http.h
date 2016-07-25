@@ -128,57 +128,79 @@ namespace http {
 
     template<> inline
     int
-    string_to<int>(const string& s) { return std::stoi(s); }
+    string_to<int>(const string& s) {
+        return int(std::strtol(s.c_str(),nullptr,0));
+    }
 
 
     template<> inline
     long
-    string_to<long>(const string& s) { return std::stol(s); }
+    string_to<long>(const string& s) {
+        return std::strtol(s.c_str(),nullptr,0);
+    }
 
 
     template<> inline
     long long
-    string_to<long long>(const string& s) { return std::stoll(s); }
+    string_to<long long>(const string& s) {
+        return std::strtoll(s.c_str(),nullptr,0);
+    }
 
 
     template<> inline
     unsigned
-    string_to<unsigned>(const string& s) { return unsigned(std::stoul(s)); }
+    string_to<unsigned>(const string& s) {
+        return unsigned(std::strtoul(s.c_str(),nullptr,0));
+    }
 
 
     template<> inline
     unsigned long
-    string_to<unsigned long>(const string& s) { return std::stoul(s); }
+    string_to<unsigned long>(const string& s) {
+        return std::strtoul(s.c_str(),nullptr,0);
+    }
 
 
     template<> inline
     unsigned long long
-    string_to<unsigned long long>(const string& s) { return std::stoull(s); }
+    string_to<unsigned long long>(const string& s) {
+        return std::strtoull(s.c_str(),nullptr,0);
+    }
 
 
     template<> inline
     float
-    string_to<float>(const string& s) { return std::stof(s); }
+    string_to<float>(const string& s) {
+        return std::strtof(s.c_str(),nullptr);
+    }
 
 
     template<> inline
     double
-    string_to<double>(const string& s) { return std::stod(s); }
+    string_to<double>(const string& s) {
+        return std::strtod(s.c_str(),nullptr);
+    }
 
 
     template<> inline
     long double
-    string_to<long double>(const string& s) { return std::stold(s); }
+    string_to<long double>(const string& s) {
+        return std::strtold(s.c_str(),nullptr);
+    }
 
 
     template<> inline
     http::method
-    string_to<http::method>(const string& s) { return string_to_method(s); }
+    string_to<http::method>(const string& s) {
+        return string_to_method(s);
+    }
 
 
     template<> inline
     http::status
-    string_to<http::status>(const string& s) { return string_to_status(s); }
+    string_to<http::status>(const string& s) {
+        return string_to_status(s);
+    }
 
 
     //--------------------------------------------------------------------------
@@ -202,20 +224,20 @@ namespace http {
     //--------------------------------------------------------------------------
 
 
-    class table {
+    class pairs {
         std::map<string, string> map;
 
     public: // structors
 
-        table() = default;
-        table(decltype(map) map) : map(std::move(map)) {};
+        pairs() = default;
+        pairs(decltype(map) map) : map(std::move(map)) {};
 
         explicit
-        table(const table&) = default;
-        table& operator=(const table&) = default;
+        pairs(const pairs&) = default;
+        pairs& operator=(const pairs&) = default;
 
-        table(table&&) = default;
-        table& operator=(table&&) = default;
+        pairs(pairs&&) = default;
+        pairs& operator=(pairs&&) = default;
 
     public: // operators
 
@@ -237,13 +259,9 @@ namespace http {
         }
 
         template<typename T>
-        T get(const string& key) const {
-            return string_to<T>(key);
-        }
-
-        template<typename T>
-        T get(const string& key, T fallback) const {
-            return has(key) ? get<T>(key) : fallback;
+        T get(const string& key, T fallback = {}) const {
+            auto itr = map.find(key);
+            return (itr != map.end()) ? string_to<T>(itr->second) : fallback;
         }
 
         void set(const string& key, string value) {
@@ -269,8 +287,8 @@ namespace http {
     struct request {
         http::method method = METHOD_UNKNOWN;
         http::string uri;
-        http::table  query;
-        http::table  headers;
+        http::pairs  query;
+        http::pairs  headers;
         http::string content;
 
     public: // structors
@@ -279,12 +297,24 @@ namespace http {
 
         request(http::method method) : method(method) {}
 
+        request(string s) { read(s); }
+
+        request(const char* s) : request(string(s)) {}
+
         explicit
         request(const request&) = default;
         request& operator=(const request&) = default;
 
         request(request&&) = default;
         request& operator=(request&&) = default;
+
+    public: // operators
+
+        explicit operator bool() const { return ok(); }
+
+    public: // properties
+
+        bool ok() const { return method > METHOD_UNKNOWN; }
 
     public: // methods
 
@@ -299,12 +329,18 @@ namespace http {
     };
 
 
+    inline
+    ip::socket& operator<<(ip::socket& out, const request& req) {
+        out.sendall(req.write()); return out;
+    }
+
+
     //--------------------------------------------------------------------------
 
 
     struct response {
         http::status status = STATUS_UNKNOWN;
-        http::table  headers;
+        http::pairs  headers;
         http::string content;
 
     public: // structors
@@ -313,6 +349,10 @@ namespace http {
 
         response(http::status status) : status(status) {}
 
+        response(string s) { read(s); }
+
+        response(const char* s) : response(string(s)) {}
+
         explicit
         response(const response&) = default;
         response& operator=(const response&) = default;
@@ -320,15 +360,31 @@ namespace http {
         response(response&&) = default;
         response& operator=(response&&) = default;
 
+    public: // operators
+
+        explicit operator bool() const { return ok(); }
+
+    public: // properties
+
+        bool ok() const { return status > STATUS_UNKNOWN; }
+
     public: // methods
 
-        void reset(http::status = STATUS_UNKNOWN);
+        void reset();
 
-        void write(string& buffer);
+        bool read(string& buffer);
 
-        string write();
+        void write(string& buffer) const;
+
+        string write() const;
 
     };
+
+
+    inline
+    ip::socket& operator<<(ip::socket& out, const response& res) {
+        out.sendall(res.write()); return out;
+    }
 
 
     //--------------------------------------------------------------------------

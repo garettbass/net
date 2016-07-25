@@ -161,11 +161,14 @@ namespace http {
                 if (transfer.size) {
                     request_buffer.append(block, transfer.size);
                     while (request.read(request_buffer)) {
-                        response.reset(NOT_IMPLEMENTED);
                         service(request, response);
+                        if (not response.ok()) {
+                            response.status = NOT_IMPLEMENTED;
+                        }
                         response.write(response_buffer);
                         socket.sendall(response_buffer);
                         response_buffer.clear();
+                        response.reset();
                     }
                     last_active_time = clock::now();
                     continue;
