@@ -107,13 +107,13 @@
     One of the following defines the endianness to an integer constant
     representing the byte order:
 
-        ENDIAN_LE (e.g. x86)
-        ENDIAN_BE    (e.g. PPC, network byte order)
+        NET_ENDIAN_LE (e.g. x86)
+        NET_ENDIAN_BE    (e.g. PPC, network byte order)
 
     Additionally, the following are defined:
 
-        ENDIAN - as either ENDIAN_LE, or ENDIAN_BE
-        ENDIAN_name - a string literal name for the CPU endianness
+        NET_ENDIAN      - either ENDIAN_LE, or ENDIAN_BE
+        NET_ENDIAN_NAME - a string literal name for the CPU endianness
 */
 
 #if (NET_CPU_X86) || (NET_CPU_ARM && !__BIG_ENDIAN__)
