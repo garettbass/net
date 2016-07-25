@@ -222,12 +222,7 @@ namespace ip {
 
     public: // operators
 
-        transfer& operator=(const transfer& lv) {
-            if (this != &lv) {
-                new(this)transfer(lv);
-            }
-            return *this;
-        }
+        transfer& operator=(const transfer& lv) { return assign(this, lv); }
 
         explicit operator bool() const { return ok(); }
 
