@@ -8,7 +8,9 @@ namespace net {
     /*==========================================================================
     T& assign(T* target, const T& source)
 
-    Safely delegates copy assignment to existing destructor/copy constructor.
+    Delegates copy assignment to existing destructor/copy constructor.
+
+    e.g. foo& operator=(const foo& lv) { return assign(this, lv); }
     --------------------------------------------------------------------------*/
     template <typename T>
     T& assign(T* target, const T& source) {
@@ -23,7 +25,9 @@ namespace net {
     /*==========================================================================
     T& assign(T* target, T&& source)
 
-    Safely delegates move assignment to existing destructor/move constructor.
+    Delegates move assignment to existing destructor/move constructor.
+
+    e.g. bar& operator=(bar&& rv) { return assign(this, std::move(rv)); }
     --------------------------------------------------------------------------*/
     template <typename T>
     T& assign(T* target, T&& source) {
