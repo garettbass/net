@@ -398,9 +398,11 @@ namespace http {
 
     class server {
 
+        using lock = std::lock_guard<std::mutex>;
+
         struct client {
             ip::socket socket;
-            std::mutex serve_mutex;
+            const int  id;
             client(ip::socket&& socket);
            ~client();
         };
@@ -440,18 +442,18 @@ namespace http {
 
         bool ok() const { return listener.ok(); }
 
+        uint16_t port() const;
+
     public: // methods
 
-        ip::error start(uint16_t port);
+        ip::error start(uint16_t port = 0);
 
         void stop();
 
-    private: // implementation
+    private: // threads
 
         void listen();
-        void accept();
         void serve(const client_ptr&);
-        void close(const client_ptr&);
 
     };
 

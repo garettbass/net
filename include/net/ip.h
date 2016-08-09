@@ -15,12 +15,17 @@ namespace ip {
     using string = std::string;
 
 
+    string gethostname();
+
+
     //--------------------------------------------------------------------------
 
 
     enum operation { READ, WRITE, READ_WRITE };
 
     enum protocol { ANY, TCP, UDP };
+
+    enum iterate { BREAK, CONTINUE };
 
 
     //--------------------------------------------------------------------------
@@ -29,11 +34,11 @@ namespace ip {
     struct address {
 
         union {
-            struct { uint32_t host; uint16_t port; };
+            struct { uint32_t host; uint16_t port; ip::protocol protocol:16; };
         #if NET_ENDIAN_LE
-            struct { uint8_t a, b, c, d; uint16_t p; };
+            struct { uint8_t d,c,b,a; uint16_t p; ip::protocol pr:16; };
         #elif NET_ENDIAN_BE
-            struct { uint8_t d, c, b, a; uint16_t p; };
+            struct { uint8_t a,b,c,d; uint16_t p; ip::protocol pr:16; };
         #else
             #error "undefined endianness"
         #endif
@@ -44,28 +49,59 @@ namespace ip {
 
         address() : bits(0) {}
 
-        address(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint16_t port = 0)
-        : a(a), b(b), c(c), d(d), p(port)
+        address(
+            uint8_t a, uint8_t b, uint8_t c, uint8_t d,
+            uint16_t port = 0, ip::protocol protocol = ANY)
+        #if NET_ENDIAN_LE
+        : d(d), c(c), b(b), a(a), p(port), pr(protocol)
+        #elif NET_ENDIAN_BE
+        : a(a), b(b), c(c), d(d), p(port), pr(protocol)
+        #endif
         {}
 
         address(uint16_t port)
         : host(0), port(port)
         {}
 
-        address(ip::protocol, const char*);
+        address(ip::protocol, const char* uri);
+
+        address(ip::protocol p, const string& uri)
+        : address(p, uri.c_str()) {}
+
+    public: // operators
+
+        explicit operator bool() const { return bits != 0; }
+
     };
 
+
+    //--------------------------------------------------------------------------
+
+
     bool addresses(
-        ip::protocol,
-        const char* address,
-        void* context,
-        void (*callback)(void*, ip::address)
+        ip::protocol, const char* url,
+        void*, iterate(*)(void*, ip::address)
     );
 
+
+    bool addresses(
+        ip::protocol, const char* url,
+        void*, void(*)(void*, ip::address)
+    );
+
+
     template<typename Callback>
-    bool addresses(ip::protocol p, const char* address, Callback&& callback) {
-        return addresses(p, address, &callback, [](void* c, ip::address a) {
-            (*(Callback*)c)(a);
+    bool addresses(ip::protocol p, const char* url, Callback&& callback) {
+        return addresses(p, url, &callback, [](void* c, ip::address a) {
+            return (*(Callback*)c)(a);
+        });
+    }
+
+
+    template<typename Callback>
+    bool addresses(const char* url, Callback&& callback) {
+        return addresses(ANY, url, &callback, [](void* c, ip::address a) {
+            return (*(Callback*)c)(a);
         });
     }
 
@@ -114,6 +150,10 @@ namespace ip {
 
         target() = default;
 
+        target(target& lv) : target((const target&)lv) {}
+        target(const target&) = default;
+        target& operator=(const target&) = default;
+
         target(void* head, size_t size)
         : head(head), size(size) { clear(); }
 
@@ -161,6 +201,10 @@ namespace ip {
     public: // structors
 
         source() = default;
+
+        source(source& lv) : source((const source&)lv) {}
+        source(const source&) = default;
+        source& operator=(const source&) = default;
 
         source(const void* head, size_t size)
         : head(head), size(size) {}
@@ -245,6 +289,8 @@ namespace ip {
 
         socket() = default;
 
+        socket(ip::protocol p) { open(p); }
+
         explicit
         socket(int id) : id(id) {}
 
@@ -260,35 +306,40 @@ namespace ip {
 
     public: // properties
 
+        ip::address address() const;
+
         static
         bool ok(int id) { return id != INVALID; }
         bool ok() const { return id != INVALID; }
+
+        uint16_t port() const { return address().port; }
 
     public: // core api
 
         socket accept() const;
 
-        error bind(address);
+        error bind(ip::address);
 
         error close();
 
-        error connect(address);
+        error connect(ip::address);
 
-        error listen() const;
-        error listen(int backlog) const;
+        error listen(int backlog = 0);
+        error listen(ip::address, int backlog = 0); // open(),bind(),listen()
 
-        error open(protocol);
+        error open(ip::protocol);
 
-        transfer recv(target) const;
-        transfer recvall(target) const;
+        transfer recv(ip::target) const;
+        transfer recvall(ip::target) const;
 
-        transfer send(source) const;
-        transfer sendall(source) const;
+        transfer send(ip::source) const;
+        transfer sendall(ip::source) const;
 
-        error shutdown(operation = READ_WRITE);
+        error shutdown(ip::operation = READ_WRITE);
 
-        error setsockopt(int level, int key, source);
+        error setsockopt(int level, int key, ip::source);
         error setsockopt(int level, int key, int value);
+        error setsockopt(int level, int key, bool value);
 
     };
 

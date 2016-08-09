@@ -132,7 +132,7 @@ namespace net {
     inline
     bool
     substr::has_prefix(const char c) const {
-        if (not _length) return {};
+        if (empty()) return {};
         return _begin[0] == c;
     }
 
@@ -150,7 +150,7 @@ namespace net {
     inline
     bool
     substr::has_suffix(const char c) const {
-        if (not _length) return {};
+        if (empty()) return {};
         return _begin[_length - 1] == c;
     }
 
@@ -296,7 +296,7 @@ namespace net {
     inline
     substr
     substr::skip(int(&cc)(int)) const {
-        if (_length == 0) return {};
+        if (empty()) return {};
         const char* itr = _begin;
         const char* const end = itr + _length;
         while (itr < end and cc(itr[0])) { ++itr; }
@@ -307,8 +307,8 @@ namespace net {
     inline
     substr
     substr::skip(const char c) const {
-        if (_length == 0) return {};
-        if (_begin[0] != c) return {};
+        if (empty()) return {};
+        if (not has_prefix(c)) return (*this);
         return { _begin + 1, _length - 1 };
     }
 
@@ -316,7 +316,8 @@ namespace net {
     inline
     substr
     substr::skip(const substr& p) const {
-        if (not has_prefix(p)) return {};
+        if (empty()) return {};
+        if (not has_prefix(p)) return (*this);
         return { _begin + p._length, _length - p._length };
     }
 
