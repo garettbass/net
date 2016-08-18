@@ -6,6 +6,9 @@
 #include "ip.h"
 
 
+#undef DELETE
+
+
 namespace net {
 namespace http {
 

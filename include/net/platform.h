@@ -1,22 +1,105 @@
 #pragma once
+#include <ciso646>
+
 
 //------------------------------------------------------------------------------
-/** @name CPU recognition macros
 
-    Identifies the CPU architecture targeted by the build toolchain.
 
-    One of the following is defined to the integer constant 1
+#if !defined(NET_DEBUG)
+    #if defined(_MSC_VER) && defined(_DEBUG)
+        #define NET_DEBUG 1
+    #elif defined(__GNUC__) && !defined(__OPTIMIZE)
+        #define NET_DEBUG 1
+    #endif
+#endif
 
-        NET_CPU_ARM
-        NET_CPU_PPC (and one of: CPU_PPC_32, CPU_PPC_64)
-        NET_CPU_X86 (and one of: CPU_X86_32, CPU_X86_64)
 
-    Additionally, the following are defined:
+//------------------------------------------------------------------------------
 
-        NET_CPU_ID - a valid C++ identifier, e.g. arm, ppc_32, x86_64
-        NET_CPU_NAME - a string literal name for the CPU architecture
-        NET_CPU_BITS - an integer constant, 32 or 64
-*/
+
+#if defined(__ANDROID__)
+
+    #define NET_PLATFORM_ANDROID 1
+
+#elif defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+
+    #define NET_PLATFORM_APPLE 1
+    #define NET_PLATFORM_IOS 1
+
+#elif defined(__linux)
+
+    #define NET_PLATFORM_LINUX 1
+
+#elif defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)
+
+    #define NET_PLATFORM_APPLE 1
+    #define NET_PLATFORM_MACOS 1
+
+#elif defined(_WIN32)
+
+    #define NET_PLATFORM_WINDOWS 1
+
+    #if __cplusplus_winrt
+        #define NET_PLATFORM_WINRT 1
+    #endif
+
+#else
+
+    #error "unrecognized platform"
+
+#endif
+
+
+//------------------------------------------------------------------------------
+
+
+#if defined(__GNUC__) && defined(__clang__)
+
+    #define NET_COMPILER_ID     clang
+    #define NET_COMPILER_CLANG  (__clang_major__ * 10 + __clang_minor__)
+    #define NET_COMPILER_NAME   "Clang " __clang_version__
+
+#elif defined(__GNUC__) && !defined(__clang__)
+
+    #define NET_COMPILER_ID    gcc
+    #define NET_COMPILER_GCC   (__GNUC__ * 10 + __GNUC_MINOR__)
+    #define NET_COMPILER_NAME  "GCC " __VERSION__
+
+#elif defined(_MSC_VER)
+
+    #define NET_COMPILER_ID  msvc
+    #if (_MSC_VER >= 1900)
+        #define NET_COMPILER_MSVC 14
+        #define NET_COMPILER_NAME "Microsoft Visual C++ 14 (2015)"
+    #elif (_MSC_VER >= 1800)
+        #define NET_COMPILER_MSVC 12
+        #define NET_COMPILER_NAME "Microsoft Visual C++ 12 (2013)"
+    #elif (_MSC_VER >= 1700)
+        #define NET_COMPILER_MSVC 11
+        #define NET_COMPILER_NAME "Microsoft Visual C++ 11 (2012)"
+    #elif (_MSC_VER >= 1600)
+        #define NET_COMPILER_MSVC 10
+        #define NET_COMPILER_NAME "Microsoft Visual C++ 10 (2010)"
+    #elif (_MSC_VER == 1500)
+        #define NET_COMPILER_MSVC 9
+        #define NET_COMPILER_NAME "Microsoft Visual C++ 9 (2008)"
+    #elif (_MSC_VER == 1400)
+        #define NET_COMPILER_MSVC 8
+        #define NET_COMPILER_NAME "Microsoft Visual C++ 8 (2005)"
+    #endif
+
+    // warning C4201: nonstandard extension used: nameless struct/union
+    #pragma warning(disable:4201)
+
+#else
+
+    #error "unrecognized compiler"
+
+#endif
+
+
+//------------------------------------------------------------------------------
+
 
 #if defined(__aarch64__)
 
@@ -100,21 +183,7 @@
 
 
 //------------------------------------------------------------------------------
-/** @name Endianness macros
 
-    Identifies the CPU endianness targeted by the build toolchain.
-
-    One of the following defines the endianness to an integer constant
-    representing the byte order:
-
-        NET_ENDIAN_LE (e.g. x86)
-        NET_ENDIAN_BE    (e.g. PPC, network byte order)
-
-    Additionally, the following are defined:
-
-        NET_ENDIAN      - either ENDIAN_LE, or ENDIAN_BE
-        NET_ENDIAN_NAME - a string literal name for the CPU endianness
-*/
 
 #if (NET_CPU_X86) || (NET_CPU_ARM && !__BIG_ENDIAN__)
 
@@ -137,5 +206,3 @@
     #error "unrecognized endianness"
 
 #endif
-
-//------------------------------------------------------------------------------

@@ -150,9 +150,8 @@ namespace ip {
 
         target() = default;
 
-        target(target& lv) : target((const target&)lv) {}
-        target(const target&) = default;
-        target& operator=(const target&) = default;
+        target(const target& lv) = default;
+        target& operator=(const target& lv) { return assign(this, lv); }
 
         target(void* head, size_t size)
         : head(head), size(size) { clear(); }
@@ -166,6 +165,7 @@ namespace ip {
         : head(array), size(sizeof(T) * LENGTH) { clear(); }
 
         template <typename T>
+        explicit
         target(T& value)
         : head(&value), size(sizeof(T)) { clear(); }
 
@@ -202,9 +202,8 @@ namespace ip {
 
         source() = default;
 
-        source(source& lv) : source((const source&)lv) {}
-        source(const source&) = default;
-        source& operator=(const source&) = default;
+        source(const source& lv) = default;
+        source& operator=(const source& lv) { return assign(this, lv); }
 
         source(const void* head, size_t size)
         : head(head), size(size) {}
@@ -220,6 +219,7 @@ namespace ip {
         : head(array), size(sizeof(T) * LENGTH) {}
 
         template <typename T>
+        explicit
         source(const T& value)
         : head(&value), size(sizeof(T)) {}
 
@@ -281,7 +281,7 @@ namespace ip {
 
     struct socket {
 
-        enum : int { INVALID = ~int(0) };
+        enum : int { INVALID = -1 };
 
         const volatile int id = INVALID;
 

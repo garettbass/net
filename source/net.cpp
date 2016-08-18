@@ -1,29 +1,50 @@
+#include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <chrono>
 #include <thread>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <netdb.h>
 #include <errno.h>
-#include <unistd.h>
 #include <net/ip.h>
 #include <net/http.h>
 #include "substr.h"
 
 
-#if _WIN32
-    #define close closesocket
+#if NET_COMPILER_MSVC
+
+    #include <WinSock2.h>
+    #include <WS2tcpip.h>
+    #undef DELETE
+    #undef min
+    #undef max
+    inline int close(int socket) { return closesocket(socket); }
+
+    #define NET_SOCKET_SYSTEM_INITIALIZATION \
+        static struct NET_SOCKET_SYSTEM_INITIALIZATION { \
+            NET_SOCKET_SYSTEM_INITIALIZATION() { \
+                WSADATA data; \
+                const int err = WSAStartup(0x202, &data); \
+                assert(not err); \
+                (void)err; \
+            } \
+           ~NET_SOCKET_SYSTEM_INITIALIZATION() { \
+                const int err = WSACleanup(); \
+                assert(not err); \
+                (void)err; \
+            } \
+        } _NET_SOCKET_SYSTEM_INITIALIZATION
+
+#else
+
+    #include <arpa/inet.h>
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <sys/time.h>
+    #include <netdb.h>
+    #include <unistd.h>
+
+    #define NET_SOCKET_SYSTEM_INITIALIZATION ((void)0)
+
 #endif
-
-
-extern "C" {
-    void* memset(void *, int, size_t);
-    int   socket(int, int, int);
-    int   close(int);
-    char* strerror(int);
-}
 
 
 //==============================================================================
@@ -35,7 +56,9 @@ namespace ip {
 
     string gethostname() {
         string hostname(255, '\0');
-        ::gethostname(&hostname.front(), hostname.size());
+        char* const out = &hostname.front();
+        int const size = int(hostname.size());
+        ::gethostname(out, size);
         hostname.resize(strlen(hostname.c_str()));
         return hostname;
     }
@@ -46,7 +69,7 @@ namespace ip {
 
     address::address(ip::protocol p, const char* s)
     : address() {
-        addresses(p, s, [this](address a) { (*this) = a; return BREAK; });
+        addresses(p, s, [this](address addr) { (*this) = addr; return BREAK; });
     }
 
 
@@ -202,7 +225,7 @@ namespace ip {
 
     error
     socket::close() {
-        const int32_t old_id = id;
+        const int old_id = id;
         new(this)socket();
         return
             ok(::close(old_id))
@@ -258,7 +281,13 @@ namespace ip {
 
     error
     socket::open(protocol p) {
-        new(this)socket(::socket(AF_INET, p, 0));
+        NET_SOCKET_SYSTEM_INITIALIZATION;
+        if (id > INVALID) close();
+        const int ipproto =
+            (p == SOCK_STREAM) ? IPPROTO_TCP :
+            (p == SOCK_DGRAM)  ? IPPROTO_UDP : 0;
+        const int new_id = ::socket(AF_INET, p, ipproto);
+        new(this)socket(new_id);
         if (not ok()) return error();
         return setsockopt(SOL_SOCKET, SO_NOSIGPIPE, true);
     }
@@ -266,7 +295,9 @@ namespace ip {
 
     transfer
     socket::recv(target data) const {
-        const ssize_t rcvd = ::recv(id, data.head, data.size, MSG_NOSIGNAL);
+        char* const head = (char*)data.head;
+        int   const size = int(data.size);
+        const size_t rcvd = ::recv(id, head, size, MSG_NOSIGNAL);
         return ~rcvd ? transfer(rcvd) : transfer(error());
     }
 
@@ -286,7 +317,9 @@ namespace ip {
 
     transfer
     socket::send(source data) const {
-        const ssize_t sent = ::send(id, data.head, data.size, MSG_NOSIGNAL);
+        const char* head = (const char*)data.head;
+        const int   size = int(data.size);
+        const size_t sent = ::send(id, head, size, MSG_NOSIGNAL);
         return ~sent ? transfer(sent) : transfer(error());
     }
 
@@ -320,9 +353,10 @@ namespace ip {
             return error::none();
         }
         #endif // SO_NOSIGPIPE
-        const socklen_t size = socklen_t(value.size);
+        const char* head = (const char*)value.head;
+        const int   size = int(value.size);
         return
-            ok(::setsockopt(id, level, key, value.head, size))
+            ok(::setsockopt(id, level, key, head, size))
             ? error::none()
             : error();
     }
@@ -678,7 +712,7 @@ namespace http {
     void
     response::write(string& buffer) const {
         buffer.append("HTTP/1.1 ");
-        buffer.append(to_string<size_t>(status));
+        buffer.append(to_string(int(status)));
         buffer.append(" ");
         buffer.append(to_string(status));
         buffer.append("\r\n");
@@ -690,14 +724,15 @@ namespace http {
             buffer.append("\r\n");
         }
 
+        const size_t content_length = content.length();
         if (not headers.has("Content-Length")) {
             buffer.append("Content-Length: ");
-            buffer.append(to_string(content.length()));
+            buffer.append(to_string(content_length));
             buffer.append("\r\n");
         }
 
         buffer.append("\r\n");
-        buffer.append(content);
+        buffer.append(content.data(), content_length);
     }
 
     string
