@@ -227,48 +227,48 @@ namespace http {
     //--------------------------------------------------------------------------
 
 
-    class pairs {
-        std::map<string, string> map;
+    class pairs : std::map<string, string> {
+        using map = std::map<string, string>;
 
     public: // structors
 
-        pairs() = default;
-        pairs(decltype(map) map) : map(std::move(map)) {};
-
-        explicit
-        pairs(const pairs&) = default;
-        pairs& operator=(const pairs&) = default;
-
-        pairs(pairs&&) = default;
-        pairs& operator=(pairs&&) = default;
+        using map::map;
 
     public: // operators
 
-        string& operator[](const string& key)       { return map[key]; }
-        string  operator[](const string& key) const { return get(key); }
+        using map::operator[];
+
+        string operator[](const string& key) const { return get(key); }
+
+    public: // properties
+
+        bool any() const { return not empty(); }
+
+        using map::empty;
+        using map::size;
 
     public: // methods
 
-        void clear() { map.clear(); }
+        using map::clear;
 
         bool has(const string& key) const {
-            auto itr = map.find(key);
-            return (itr != map.end());
+            auto itr = map::find(key);
+            return (itr != map::end());
         }
 
         string get(const string& key) const {
-            auto itr = map.find(key);
-            return (itr != map.end()) ? itr->second : string{""};
+            auto itr = map::find(key);
+            return (itr != map::end()) ? itr->second : string{""};
         }
 
         template<typename T>
         T get(const string& key, T fallback = {}) const {
-            auto itr = map.find(key);
-            return (itr != map.end()) ? string_to<T>(itr->second) : fallback;
+            auto itr = map::find(key);
+            return (itr != map::end()) ? string_to<T>(itr->second) : fallback;
         }
 
         void set(const string& key, string value) {
-            map[key] = value;
+            map::operator[](key) = value;
         }
 
         template<typename T>
@@ -278,13 +278,16 @@ namespace http {
 
     public: // iterators
 
-        decltype(map.cbegin()) begin() const { return map.cbegin(); }
-        decltype(map.cend())     end() const { return map.cend(); }
+        map::const_iterator begin() const { return map::cbegin(); }
+        map::const_iterator   end() const { return map::cend(); }
 
     };
 
 
     //--------------------------------------------------------------------------
+
+
+    struct response;
 
 
     struct request {
@@ -296,9 +299,18 @@ namespace http {
 
     public: // structors
 
-        request() = default;
-
-        request(http::method method) : method(method) {}
+        request(
+            http::method method  = METHOD_UNKNOWN,
+            http::string uri     = {},
+            http::pairs  query   = {},
+            http::pairs  headers = {},
+            http::string content = {}
+        )
+        : method (method)
+        , uri    (uri)
+        , query  (query)
+        , headers(headers)
+        , content(content) {}
 
         request(string s) { read(s); }
 
@@ -328,6 +340,8 @@ namespace http {
         void write(string& buffer) const;
 
         string write() const;
+
+        response send() const;
 
     };
 
@@ -388,6 +402,16 @@ namespace http {
     ip::socket& operator<<(ip::socket& out, const response& res) {
         out.sendall(res.write()); return out;
     }
+
+
+    //--------------------------------------------------------------------------
+
+
+    response get(string uri, pairs query = {}, pairs headers = {});
+
+    response getJSON(string uri, pairs query = {});
+    response getHTML(string uri, pairs query = {});
+    response getText(string uri, pairs query = {});
 
 
     //--------------------------------------------------------------------------

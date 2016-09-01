@@ -2,6 +2,8 @@
 #include <cassert>
 #include <cstring>
 #include <chrono>
+#include <iostream>
+#include <iomanip>
 #include <thread>
 #include <errno.h>
 #include <net/ip.h>
@@ -70,6 +72,24 @@ namespace ip {
     address::address(ip::protocol p, const char* s)
     : address() {
         addresses(p, s, [this](address addr) { (*this) = addr; return BREAK; });
+    }
+
+
+    std::ostream& operator<<(std::ostream& out, const ip::address& a) {
+        out << int(a.a) << '.'
+            << int(a.b) << '.'
+            << int(a.c) << '.'
+            << int(a.d);
+        if (a.port) {
+            out << ":" << a.port;
+        }
+        switch (a.protocol) {
+            case ANY : out << " (ANY)"; break;
+            case TCP : out << " (TCP)"; break;
+            case UDP : out << " (UDP)"; break;
+            default: break;
+        }
+        return out;
     }
 
 
@@ -176,6 +196,11 @@ namespace ip {
     error::message() const { return id ? strerror(id) : "OK"; }
 
 
+    std::ostream& operator<<(std::ostream& out, const error& e) {
+        return out << "error(" << e.id << "): '" << e.message() << "'";
+    }
+
+
     // target ==================================================================
 
 
@@ -209,7 +234,9 @@ namespace ip {
     error
     socket::bind(ip::address address) {
         if (not ok()) {
-            if (auto err = open(address.protocol)) return err;
+            if (auto err = open(address.protocol)) {
+                return err;
+            }
         }
         sockaddr_in sa;
         memset(&sa, 0, sizeof(sa));
@@ -237,7 +264,9 @@ namespace ip {
     error
     socket::connect(ip::address address) {
         if (not ok()) {
-            if (auto err = open(address.protocol)) return err;
+            if (auto err = open(address.protocol)) {
+                return err;
+            }
         }
         sockaddr_in sa;
         memset(&sa, 0, sizeof(sa));
@@ -635,6 +664,16 @@ namespace http {
         buffer.append(method_to_string(method));
         buffer.append(" ");
         buffer.append(uri);
+        if (query.any()) {
+            buffer.append("?");
+            for (auto& pair : query) {
+                buffer.append(pair.first);
+                buffer.append("=");
+                buffer.append(pair.second);
+                buffer.append("&");
+            }
+            buffer.pop_back();
+        }
         buffer.append(" HTTP/1.1\r\n");
         for (auto& pair : headers) {
             buffer.append(pair.first);
@@ -735,11 +774,79 @@ namespace http {
         buffer.append(content.data(), content_length);
     }
 
+
     string
     response::write() const {
         string buffer;
         write(buffer);
         return buffer;
+    }
+
+
+    response
+    request::send() const {
+        ip::address address(ip::TCP, uri);
+        if (not address.ok()) return {};
+
+        ip::socket socket;
+        if (auto err = socket.connect(address)) {
+            std::cout << "socket.connect(" << address << ") " << err << '\n';
+            return {};
+        }
+
+        std::string  message = write();
+        ip::transfer tx = socket.sendall(message);
+        if (tx.error) {
+            std::cout << "socket.sendall(message) " << tx.error << '\n';
+            return {};
+        }
+
+        response response; string response_buffer;
+
+        char block[4096];
+        while ((tx = socket.recv(block)) and tx.size) {
+            response_buffer.append(block, tx.size);
+            if (response.read(response_buffer)) {
+                std::cout << "received!\n";
+                return response;
+            }
+        }
+
+        if (tx.error) {
+            std::cout << "socket.recv(block) " << tx.error << '\n';
+        }
+        return {};
+    }
+
+
+    // get =====================================================================
+
+
+    response
+    get(string uri, pairs query, pairs headers) {
+        request req { GET, uri, {}, std::move(headers) };
+        return req.send();
+    }
+
+
+    response
+    getJSON(string uri, pairs query) {
+        pairs headers {};// {{"Accept", "application/json"}};
+        return get(uri, std::move(query), std::move(headers));
+    }
+
+
+    response
+    getHTML(string uri, pairs query) {
+        pairs headers {{"Accept", "text/html"}};
+        return get(uri, std::move(query), std::move(headers));
+    }
+
+
+    response
+    getText(string uri, pairs query) {
+        pairs headers {{"Accept", "text/plain"}};
+        return get(uri, std::move(query), std::move(headers));
     }
 
 

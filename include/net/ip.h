@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <iosfwd>
 #include <new>
 #include <string>
 #include "platform.h"
@@ -70,9 +71,16 @@ namespace ip {
 
     public: // operators
 
-        explicit operator bool() const { return bits != 0; }
+        explicit operator bool() const { return ok(); }
+
+    public: // properties
+
+        bool ok() const { return bits != 0; }
 
     };
+
+
+    std::ostream& operator<<(std::ostream&, const ip::address&);
 
 
     //--------------------------------------------------------------------------
@@ -136,6 +144,9 @@ namespace ip {
 
         const char* message() const;
     };
+
+
+    std::ostream& operator<<(std::ostream&, const error&);
 
 
     //--------------------------------------------------------------------------
