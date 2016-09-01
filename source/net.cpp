@@ -841,7 +841,7 @@ namespace http {
 
     response
     getJSON(string uri, pairs query) {
-        pairs headers {};// {{"Accept", "application/json"}};
+        pairs headers {{"Accept", "application/json"}};
         return get(uri, std::move(query), std::move(headers));
     }
 
