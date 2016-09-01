@@ -693,6 +693,47 @@ namespace http {
     }
 
 
+    response
+    request::send() const {
+        ip::address address(ip::TCP, uri);
+        if (not address.ok()) return {};
+
+        ip::socket socket;
+        if (auto err = socket.connect(address)) {
+            std::cout << "socket.connect(" << address << ") " << err << '\n';
+            return {};
+        }
+
+        std::string  message = write();
+        ip::transfer tx = socket.sendall(message);
+        if (tx.error) {
+            std::cout << "socket.sendall(message) " << tx.error << '\n';
+            return {};
+        }
+
+        response response; string response_buffer;
+
+        char block[4096];
+        while ((tx = socket.recv(block)) and tx.size) {
+            response_buffer.append(block, tx.size);
+            if (response.read(response_buffer)) {
+                std::cout << "received!\n";
+                return response;
+            }
+        }
+
+        if (tx.error) {
+            std::cout << "socket.recv(block) " << tx.error << '\n';
+        }
+        return {};
+    }
+
+
+    std::ostream& operator<<(std::ostream& out, const request& req) {
+        return out << req.write();
+    }
+
+
     // response ================================================================
 
 
@@ -783,39 +824,8 @@ namespace http {
     }
 
 
-    response
-    request::send() const {
-        ip::address address(ip::TCP, uri);
-        if (not address.ok()) return {};
-
-        ip::socket socket;
-        if (auto err = socket.connect(address)) {
-            std::cout << "socket.connect(" << address << ") " << err << '\n';
-            return {};
-        }
-
-        std::string  message = write();
-        ip::transfer tx = socket.sendall(message);
-        if (tx.error) {
-            std::cout << "socket.sendall(message) " << tx.error << '\n';
-            return {};
-        }
-
-        response response; string response_buffer;
-
-        char block[4096];
-        while ((tx = socket.recv(block)) and tx.size) {
-            response_buffer.append(block, tx.size);
-            if (response.read(response_buffer)) {
-                std::cout << "received!\n";
-                return response;
-            }
-        }
-
-        if (tx.error) {
-            std::cout << "socket.recv(block) " << tx.error << '\n';
-        }
-        return {};
+    std::ostream& operator<<(std::ostream& out, const response& res) {
+        return out << res.write();
     }
 
 

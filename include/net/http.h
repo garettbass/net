@@ -352,6 +352,9 @@ namespace http {
     }
 
 
+    std::ostream& operator<<(std::ostream&, const request&);
+
+
     //--------------------------------------------------------------------------
 
 
@@ -402,6 +405,9 @@ namespace http {
     ip::socket& operator<<(ip::socket& out, const response& res) {
         out.sendall(res.write()); return out;
     }
+
+
+    std::ostream& operator<<(std::ostream&, const response&);
 
 
     //--------------------------------------------------------------------------
